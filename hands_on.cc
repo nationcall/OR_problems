@@ -39,7 +39,6 @@ int main(int argc, char **argv){
 		std::cout << "objective is:" << objective << std::endl;
 	}
 	env.end();
-
 }
 */
 
@@ -86,15 +85,17 @@ namespace tsp_example{
 		}
 		for(int i=0;i<num_locations;i++){
 			for(int j=0;j<num_locations;j++){
-				distances[i][j]=sqrt(pow(data[i+1][0]-data[j+1][0],2)+
+				float raw_no =sqrt(pow(data[i+1][0]-data[j+1][0],2)+
 				pow(data[i+1][1]-data[j+1][1],2));
+				distances[i][j] = roundf(raw_no*100)/100;
+				//cout << distances[i][j] << endl;
 			}
-		}
+		} 
 		return distances;
 		
 	}
 
-	void formulateModel(vector< vector<double> >data, vector<vector<double> > distances){
+	void formulateModel(vector< vector<double> > &data, vector<vector<double> > & distances){
 		//formulate the optimization model
 		//Objective:
 		//
@@ -112,78 +113,117 @@ namespace tsp_example{
 		//		x[i]-x[j]+1 <= n*(1-R[i,j])   (4)  derived from: 1. R[i,j]=1 <=> x[i]-x[j]=-1, 2. R[i,j]=0 <=> x[i]-x[j]!=1
 		int num_locations=data.size()-1;
 		cout << "num_location = " << num_locations << endl;
+		
 		IloEnv env;
 		IloModel mdl(env);
-		
-		IloNumVarArray x(env,num_locations,0,num_locations-1, ILOINT); //value range start from 1
-		
-		//constraint (1)
-		for(int i=0;i<num_locations;i++){
-			for(int j=i+1;j<num_locations;j++){
-				mdl.add(x[i]!=x[j]);
+		IloNumVarArray x(env,num_locations); //value range start from 1
+		std::stringstream name;
+		try{
+
+			
+			for(auto i=0;i<num_locations;i++){
+				name << "x_" << i;
+				x[i] = IloNumVar(env,0,num_locations-1,ILOINT,name.str().c_str());
+				name.str("");
 			}
-		}
-		
-		NumVarMatrix R; //assign variable matrix
-		//initialize R
-		for(int i=0;i<num_locations;i++){
-			R[i] = IloNumVarArray(env,num_locations); //binary variable
-			for(int j=0;j<num_locations;j++){
-				R[i][j] = IloNumVar(env,0,1,ILOINT);
-			}
-		}
-		//constraint (2)
-		
-		for(int i=0;i<num_locations;i++){
-			IloExpr c1(env);
-			for(int j=0;j<num_locations;j++){
-				c1 += R[i][j];
-			}
-			mdl.add(c1 == 1);
-		}
-		//constraint (3)
-		for(int j=0;j<num_locations;j++){
-			IloExpr c1(env);
+			//constraint (1)
 			for(int i=0;i<num_locations;i++){
-				c1 += R[i][j];
+				for(int j=0;j<num_locations;j++){
+					//cout << "("<<i << "," <<j<<")" << endl;
+					if(i==j){continue;}
+					//IloAdd(mdl,IloDiff(env,x[i],x[j]));
+					//IloAdd(mdl,IloDiff(env,x[i],x[j]));
+					//mdl.add((x[i] - x[j] > 0) || (x[i] - x[j] < 0));
+				}
 			}
-			mdl.add(c1 == 1);
-		}
-		//constraint (4)
-		for(int i=0;i<num_locations;i++){
-			for(int j=0;j<num_locations;j++){
-				mdl.add(x[i]-x[j]+1 <= num_locations*(1-R[i][j])); 
-			}
-		}
-		
-		//objective
-		IloExpr expr_obj(env);
-		for(int i=0;i<num_locations;i++){
-			for(int j=0;j<num_locations;j++){
-				expr_obj += distances[i][j]*R[i][j];
-			}	
-		}
-		IloObjective obj(env,expr_obj,IloObjective::Minimize);
-		mdl.add(obj);
-		IloCplex cplex(mdl);
-		cplex.solve();
-		if(cplex.getStatus()){
-			//int* val1 = cplex.getValues(x);
-			cout << "X value is:" << endl;
+			mdl.add(x[0]==0);
+			NumVarMatrix R(env,num_locations); //assign variable matrix
+			//initialize R
 			for(int i=0;i<num_locations;i++){
-				int val = cplex.getValue(x[i]);
-				cout << val << ",";
+				R[i] = IloNumVarArray(env,num_locations); //binary variable
+				for(int j=0;j<num_locations;j++){
+					name << "R_" << i << "_" << j;
+					R[i][j] = IloNumVar(env,0,1,ILOINT,name.str().c_str());
+					name.str("");
+				}
 			}
-			//IloNum val2 = cplex.getValue(x2);
-			IloNum objective = cplex.getObjValue();
-			//std::cout << "x is:" << val1 << std::endl;
-			std::cout << "objective is:" << objective << std::endl;
-		}
-		else{
-			cout << "solution status failed!" << endl;
-		}
+			//constraint (2)
+			
+			for(int i=0;i<num_locations;i++){
+				IloExpr c1(env);
+				
+				for(int j=0;j<num_locations;j++){
+					if(i==j){
+						continue;
+					}
+					c1 += R[i][j];
+				}
+				mdl.add(c1 == 1);
+			}
+			//constraint (3)
+			for(int j=0;j<num_locations;j++){
+				IloExpr c1(env);
+				for(int i=0;i<num_locations;i++){
+					if(i==j){
+						continue;
+					}
+					c1 += R[i][j];
+				}
+				mdl.add(c1 == 1);
+			}
+			//constraint (4)
+			for(int i=0;i<num_locations;i++){
+				for(int j=0;j<num_locations;j++){
+					if(i==j){
+						continue;
+					}
+					mdl.add(x[i]-x[j]+1 <= num_locations*(1-R[i][j])); 
+				}
+			}
+			
+			//objective
+			IloExpr expr_obj(env);
+			for(int i=0;i<num_locations;i++){
+				for(int j=0;j<num_locations;j++){
+					if(i==j){
+						continue;
+					}
+					expr_obj += round(distances[i][j]*100)/100*R[i][j];
+				}	
+			}
+		
+			IloObjective obj(env,expr_obj,IloObjective::Minimize);
+			mdl.add(obj);
+			
+			IloCplex cplex(mdl);
+			cplex.exportModel("tsp_model.lp");
+			cplex.solve();
+			if(cplex.getStatus()){
+				//int* val1 = cplex.getValues(x);
+				cout << "X value is:" << endl;
+				for(int i=0;i<num_locations;i++){
+					int val = cplex.getValue(x[i]);
+					cout << val << ",";
+				}
+				//IloNum val2 = cplex.getValue(x2);
+				IloNum objective = cplex.getObjValue();
+				//std::cout << "x is:" << val1 << std::endl;
+				std::cout << "objective is:" << objective << std::endl;
+			}
+			else{
+				cout << "solution status failed!" << endl;
+			}
 		env.end();
+		}
+		catch(IloException &e){
+			cerr << "Concert exception caught: " << e << endl;
+		}
+		catch(...){
+			cerr << "Unknown exception caught: " << endl;
+		}
+		
 	}
+	
 
 }
 
@@ -222,11 +262,19 @@ namespace optimus{
 
 }
 
-int main(){
-	//vector< vector<double> > data = tsp_example::readInput("/home/steve/Downloads/coursera_Dis_Opt/tsp/data/tsp_5_1");
-	//vector< vector<double> > dists = tsp_example::calc_dist(data);
+int main(int argc, char** argv){
+	string filename = argv[1];
+	//vector< vector<double> > data = tsp_example::readInput("/home/steve/Documents/coursera_Dis_Opt/tsp/data/tsp_5_1");
+	vector< vector<double> > data = tsp_example::readInput(filename);
+	vector< vector<double> > dists = tsp_example::calc_dist(data);
+	for(auto i=dists.begin();i!=dists.end();i++){
+		for(auto j=(*i).begin();j!=(*i).end();j++){
+			cout << *j << ",";
+		}
+		cout << endl;
+	}
 
-	//tsp_example::formulateModel(data,dists);
-	optimus::getModel();
+	tsp_example::formulateModel(data,dists);
+	//optimus::getModel();
 	return 0;
 }
