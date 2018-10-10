@@ -1,0 +1,3 @@
+end_id,end_lat,end_lng,start_id,start_lat,start_lng,vehicle_id,max_weight,max_vol,start_time,stop_time,max_time,fixed_break,no_available,attributes
+SETPOWERFOODS,14.690953,121.09976,SETPOWERFOODS,14.690953,121.09976,L300 AUV DLX,1300,3.624556364,00:00,23:59,540,11:00-11:15,4,zone1;
+,,,BLUCOFFEE,14.602414,121.096511,L300 AUV EXD,1300,4.077625909,00:00,23:59,540,11:00-11:15,5,zone2;bluecoffee
